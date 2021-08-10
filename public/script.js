@@ -1,10 +1,12 @@
-const socket = io("/");
-// const socket = io("https://api.stage.embracesg.io/");
+// const socket = io("/");
+const socket = io("https://api.stage.embracesg.io/");
 
 // GLOBAL VARIABLES
 let ACCESS_TOKEN = null;
-let EVENT_ID = "6111e4b30f131b002d6377e1";
+let EVENT_ID = "6111ea390f131b002d637821";
 let myPeer;
+let myPeerId = null;
+let myStream = null;
 let stream_map = {};
 
 async function loginAsChalaka() {
@@ -34,18 +36,16 @@ async function loginAsVishva() {
 async function init() {
   try {
     // authenticate socket io
-    // await authenticateSocket();
+    await authenticateSocket();
 
     // start and add my stream to html
     const stream = await startMyStream();
+    myStream = stream;
     addVideoStream(stream, true);
-
-    // setup events
-    setupPeerJsEvents(stream);
 
     // setup socket io events
     setupSocketEvents(stream);
-  } catch (err) {
+  } catch (error) {
     console.warn(error);
   }
 }
@@ -71,6 +71,30 @@ async function loginRequest(email, password) {
       }
     });
     xhr.open("POST", "https://api.stage.embracesg.io/authentication");
+    xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    xhr.setRequestHeader("Access-Control-Allow-Origin", "*");
+    xhr.send(data);
+  });
+}
+
+async function createVoiceCallRequest(eventId, peerId) {
+  return new Promise((resolve, reject) => {
+    const _eventId = encodeURIComponent(eventId);
+    const _peerId = encodeURIComponent(peerId);
+    var data = `eventId=${_eventId}&peerId=${_peerId}`;
+    const xhr = new XMLHttpRequest();
+    xhr.addEventListener("readystatechange", function () {
+      if (this.readyState === 4 && this.status === 201) {
+        const response = JSON.parse(this.responseText);
+        resolve(response);
+      }
+      if (this.readyState === 4 && this.status === 401) {
+        const response = JSON.parse(this.responseText);
+        reject(response);
+      }
+    });
+    xhr.open("POST", "https://api.stage.embracesg.io/voice-calls");
+    xhr.setRequestHeader("Authorization", ACCESS_TOKEN);
     xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
     xhr.setRequestHeader("Access-Control-Allow-Origin", "*");
     xhr.send(data);
@@ -114,7 +138,24 @@ async function startMyStream() {
   });
 }
 
-function setupPeerJsEvents(stream) {
+function addVideoStream(stream, muted = false) {
+  if (stream_map[stream.id]) {
+    return;
+  }
+
+  stream_map[stream.id] = true;
+
+  const video = document.createElement("video");
+  video.srcObject = stream;
+  video.muted = muted;
+  video.addEventListener("loadedmetadata", () => {
+    video.play();
+  });
+  const videoGrid = document.getElementById("video-grid");
+  videoGrid.append(video);
+}
+
+function initPeer() {
   myPeer = new Peer(undefined, {
     config: {
       iceServers: [
@@ -123,21 +164,20 @@ function setupPeerJsEvents(stream) {
       ],
     },
   });
+}
+
+async function startCall() {
+  console.log("[f()] Start call");
+  // patient
+  initPeer();
 
   myPeer.on("open", (peerId) => {
+    myPeerId = peerId;
     console.log("PeerJs Opened. My Peer Id:", peerId);
-    socket.emit(
-      "patch",
-      "voice-calls",
-      null,
-      { eventId: EVENT_ID, peerId },
-      { joinCall: true, eventId: EVENT_ID }
-    );
+    socket.emit("create", "voice-calls", { eventId: EVENT_ID, peerId });
   });
 
-  // when a call is received
   myPeer.on("call", (call) => {
-    // immediately answer the call with my stream
     call.answer(stream);
 
     call.on("stream", (remoteStream) => {
@@ -149,7 +189,60 @@ function setupPeerJsEvents(stream) {
   });
 }
 
+async function endCall() {
+  console.log("[f()] End call");
+  // patient
+  socket.emit(
+    "patch",
+    "voice-calls",
+    null,
+    { eventId: EVENT_ID },
+    { endCall: true, eventId: EVENT_ID }
+  );
+}
+
+async function joinCall() {
+  console.log("[f()] Join call");
+  // volunteer
+  initPeer();
+
+  myPeer.on("open", (peerId) => {
+    socket.emit(
+      "patch",
+      "voice-calls",
+      null,
+      { eventId: EVENT_ID, peerId },
+      { joinCall: true, eventId: EVENT_ID }
+    );
+  });
+
+  myPeer.on("call", (call) => {
+    call.answer(myStream);
+
+    call.on("stream", (remoteStream) => {
+      addVideoStream(remoteStream);
+    });
+    call.on("close", () => {
+      // handle close event
+    });
+  });
+}
+
+async function leaveCall() {
+  console.log("[f()] Leave call");
+  // volunteer
+  socket.emit(
+    "patch",
+    "voice-calls",
+    null,
+    { eventId: EVENT_ID },
+    { leaveCall: true }
+  );
+}
+
 function setupSocketEvents(stream) {
+  console.log("[f()] Setup Socket Events");
+
   socket.on("voice-calls user_connected", ({ peerId }) => {
     console.log("[Socket] user_connected:", peerId);
     connectToNewPeer(peerId, stream);
@@ -171,21 +264,4 @@ function connectToNewPeer(peerId, stream) {
   call.on("close", () => {
     // handle close
   });
-}
-
-function addVideoStream(stream, muted = false) {
-  if (stream_map[stream.id]) {
-    return;
-  }
-
-  stream_map[stream.id] = true;
-
-  const video = document.createElement("video");
-  video.srcObject = stream;
-  video.muted = muted;
-  video.addEventListener("loadedmetadata", () => {
-    video.play();
-  });
-  const videoGrid = document.getElementById("video-grid");
-  videoGrid.append(video);
 }

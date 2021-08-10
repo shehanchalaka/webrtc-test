@@ -8,8 +8,8 @@
         const ROOM_ID = "<%= roomId %>"
     </script>
     <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js" defer></script>
-    <script src="/socket.io/socket.io.js" defer></script>
-    <!-- <script src="https://api.stage.embracesg.io/socket.io/socket.io.js"></script> -->
+    <!-- <script src="/socket.io/socket.io.js" defer></script> -->
+    <script src="https://api.stage.embracesg.io/socket.io/socket.io.js"></script>
     <script src="script.js" defer></script>
     <title>Document</title>
     <style>
@@ -36,7 +36,10 @@
     <button onclick="loginAsVishva()">Login as Vishva</button>
 
     <div>
-        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="startCall()">Start call (patient)</button>
+        <button onclick="endCall()">End call (patient)</button>
+        <button onclick="joinCall()">Join call (volunteer)</button>
+        <button onclick="leaveCall()">Leave call (volunteer)</button>
     </div>
 
     <div id="video-grid"></div>
