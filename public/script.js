@@ -8,6 +8,7 @@ let myPeer;
 let myPeerId = null;
 let myStream = null;
 let stream_map = {};
+let peer_map = {};
 
 async function loginAsChalaka() {
   try {
@@ -178,7 +179,7 @@ async function startCall() {
   });
 
   myPeer.on("call", (call) => {
-    call.answer(stream);
+    call.answer(myStream);
 
     call.on("stream", (remoteStream) => {
       addVideoStream(remoteStream);
@@ -207,6 +208,7 @@ async function joinCall() {
   initPeer();
 
   myPeer.on("open", (peerId) => {
+    myPeerId = peerId;
     socket.emit(
       "patch",
       "voice-calls",
@@ -235,8 +237,8 @@ async function leaveCall() {
     "patch",
     "voice-calls",
     null,
-    { eventId: EVENT_ID },
-    { leaveCall: true }
+    { eventId: EVENT_ID, peerId: myPeerId },
+    { leaveCall: true, eventId: EVENT_ID }
   );
 }
 
@@ -250,7 +252,15 @@ function setupSocketEvents(stream) {
 
   socket.on("voice-calls user_disconnected", ({ peerId }) => {
     console.log("[Socket] user_disconnected:", peerId);
-    // if (peers[peerId]) peers[peerId].close();
+    if (peer_map[peerId]) peer_map[peerId].close();
+  });
+
+  socket.on("voice-calls created", (data) => {
+    console.log("[Socket] call created:", data);
+  });
+
+  socket.on("voice-calls call_ended", (data) => {
+    console.log("[Socket] call ended:", data);
   });
 }
 
@@ -264,4 +274,6 @@ function connectToNewPeer(peerId, stream) {
   call.on("close", () => {
     // handle close
   });
+
+  peer_map[peerId] = call;
 }
