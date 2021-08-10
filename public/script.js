@@ -240,6 +240,9 @@ async function leaveCall() {
     { eventId: EVENT_ID, peerId: myPeerId },
     { leaveCall: true, eventId: EVENT_ID }
   );
+
+  myPeer.destroy();
+  myPeer = null;
 }
 
 function setupSocketEvents(stream) {
