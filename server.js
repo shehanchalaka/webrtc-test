@@ -18,16 +18,18 @@ app.get("/:room", (req, res) => {
 });
 
 io.on("connection", (socket) => {
-  console.log("Client connnected", socket.id);
+  console.log("Client connnected, Socket ID:", socket.id);
 
-  socket.on("join-room", (roomId, userId) => {
-    console.log("Client joined room", roomId, userId);
+  socket.on("patch", (arg1, arg2, { eventId, peerId }, arg4) => {
+    console.log("Client joined room", eventId, peerId);
 
-    socket.join(roomId);
-    socket.broadcast.to(roomId).emit("user-connected", userId);
+    socket.join(eventId);
+    socket.broadcast.to(eventId).emit("voice-calls user_connected", { peerId });
 
     socket.on("disconnect", () => {
-      socket.broadcast.to(roomId).emit("user-disconnected", userId);
+      socket.broadcast
+        .to(eventId)
+        .emit("voice-calls user_disconnected", { peerId });
     });
   });
 });

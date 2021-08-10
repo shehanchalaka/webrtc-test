@@ -1,9 +1,11 @@
-const socket = io("https://api.stage.embracesg.io/");
+const socket = io("/");
+// const socket = io("https://api.stage.embracesg.io/");
 
 // GLOBAL VARIABLES
 let ACCESS_TOKEN = null;
 let EVENT_ID = "6111e4b30f131b002d6377e1";
 let myPeer;
+let stream_map = {};
 
 async function loginAsChalaka() {
   try {
@@ -32,7 +34,7 @@ async function loginAsVishva() {
 async function init() {
   try {
     // authenticate socket io
-    await authenticateSocket();
+    // await authenticateSocket();
 
     // start and add my stream to html
     const stream = await startMyStream();
@@ -46,6 +48,10 @@ async function init() {
   } catch (err) {
     console.warn(error);
   }
+}
+
+function disconnect() {
+  myPeer.destroy();
 }
 
 async function loginRequest(email, password) {
@@ -145,13 +151,13 @@ function setupPeerJsEvents(stream) {
 
 function setupSocketEvents(stream) {
   socket.on("voice-calls user_connected", ({ peerId }) => {
-    console.log("[Socket] user_connected:", data.peerId);
+    console.log("[Socket] user_connected:", peerId);
     connectToNewPeer(peerId, stream);
   });
 
   socket.on("voice-calls user_disconnected", ({ peerId }) => {
-    console.log("[Socket] user_disconnected:", data.peerId);
-    // if (peers[data.peerId]) peers[data.peerId].close();
+    console.log("[Socket] user_disconnected:", peerId);
+    // if (peers[peerId]) peers[peerId].close();
   });
 }
 
@@ -168,6 +174,12 @@ function connectToNewPeer(peerId, stream) {
 }
 
 function addVideoStream(stream, muted = false) {
+  if (stream_map[stream.id]) {
+    return;
+  }
+
+  stream_map[stream.id] = true;
+
   const video = document.createElement("video");
   video.srcObject = stream;
   video.muted = muted;
